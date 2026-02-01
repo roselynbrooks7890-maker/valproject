@@ -29,6 +29,11 @@
         
         .btn-hover { transition: all 0.3s ease; }
         .btn-hover:active { transform: scale(0.95); }
+
+        /* Specific Hover Effects */
+        .btn-accept:hover { background-color: #e11d48; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(225, 29, 72, 0.4); }
+        .btn-decline:hover { background-color: #fee2e2; color: #ef4444; transform: translateY(-1px); }
+        .btn-note:hover { background-color: #f0f9ff; color: #0ea5e9; transform: translateY(-1px); }
     </style>
 
     <script type="module">
@@ -58,7 +63,15 @@
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
-                document.getElementById('display-type').innerText = data.type;
+                const titleText = document.getElementById('proposal-title');
+                
+                // Grammar Fix Logic
+                if (data.type === "Marriage") {
+                    titleText.innerHTML = 'Will you <span class="text-rose-500">marry me</span>? 💍';
+                } else {
+                    titleText.innerHTML = 'Will you be my <span class="text-rose-500">Valentine</span>? ❤️';
+                }
+
                 document.getElementById('display-msg').innerText = `"${data.msg}"`;
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('content').classList.remove('hidden');
@@ -78,13 +91,12 @@
                     reason: reason || ""
                 });
 
-                // Set Modal Content
                 if(status === 'accepted') {
                     document.getElementById('modal-icon').innerText = "💖";
                     document.getElementById('modal-title').innerText = "It's a Yes!";
                     document.getElementById('modal-text').innerText = "Your partner will be notified immediately. How romantic!";
                 } else {
-                    document.getElementById('modal-icon').innerText = "🥀";
+                    document.getElementById('modal-icon').innerText = "🥀💔";
                     document.getElementById('modal-title').innerText = "Response Sent";
                     document.getElementById('modal-text').innerText = "Your answer has been shared privately with your partner.";
                 }
@@ -123,25 +135,25 @@
                 <span class="text-5xl animate-bounce">💝</span>
             </div>
 
-            <h1 class="text-3xl font-black text-gray-800 mb-2 cursive">
-                Will you be my <span id="display-type" class="text-rose-500">...</span>? ❤️
-            </h1>
+            <h1 id="proposal-title" class="text-3xl font-black text-gray-800 mb-2 cursive">
+                </h1>
 
             <div class="mb-8">
                 <p id="display-msg" class="text-gray-500 italic text-sm px-4 leading-relaxed"></p>
             </div>
 
             <div class="space-y-4">
-                <button onclick="respond('accepted')" class="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg btn-hover text-sm tracking-widest">
+                <button onclick="respond('accepted')" class="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg btn-hover btn-accept text-sm tracking-widest">
                     ACCEPT ❤️
                 </button>
 
-                <div class="flex gap-2">
-                    <button onclick="respond('declined')" class="flex-1 bg-gray-50 text-gray-400 py-3 rounded-xl font-bold text-[10px] uppercase tracking-tighter btn-hover">
-                        Decline
+                <div class="flex flex-col gap-3">
+                    <button onclick="respond('declined')" class="w-full bg-gray-50 text-gray-400 py-3 rounded-xl font-bold text-[11px] uppercase tracking-widest btn-hover btn-decline">
+                        Decline 💔
                     </button>
-                    <button onclick="document.getElementById('note-box').classList.toggle('hidden')" class="flex-1 bg-gray-50 text-gray-400 py-3 rounded-xl font-bold text-[10px] uppercase tracking-tighter btn-hover">
-                        Add Note
+                    
+                    <button onclick="document.getElementById('note-box').classList.toggle('hidden')" class="w-full bg-gray-50 text-gray-400 py-3 rounded-xl font-bold text-[11px] uppercase tracking-widest btn-hover btn-note">
+                        Add Note 📝
                     </button>
                 </div>
 
