@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Response | Propose.ly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #fff1f2; overflow-x: hidden; }
+        .cursive { font-family: 'Dancing Script', cursive; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); }
+        @keyframes heart-pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        .pulse { animation: heart-pulse 2s infinite ease-in-out; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl glass rounded-[3rem] shadow-2xl overflow-hidden border-4 border-white p-8 md:p-12 text-center relative">
+        
+        <div id="loading" class="py-20 text-rose-400 cursive text-3xl animate-pulse">
+            Loading the moment...
+        </div>
+        
+        <div id="content" class="hidden">
+            <h1 id="res-status" class="text-5xl md:text-7xl font-black cursive mb-6 transition-all"></h1>
+            
+            <div class="relative inline-block mb-8">
+                <img id="res-gif" src="" class="w-64 h-64 md:w-80 md:h-80 object-cover rounded-full mx-auto border-8 border-rose-100 shadow-2xl pulse">
+            </div>
+
+            <div class="max-w-md mx-auto space-y-6">
+                <div class="bg-rose-50 rounded-3xl p-6 border border-rose-100">
+                    <p class="text-[10px] uppercase font-black tracking-widest text-rose-300 mb-2">The Proposal</p>
+                    <p id="res-msg" class="text-gray-700 italic text-lg leading-relaxed"></p>
+                </div>
+
+                <div id="reason-box" class="hidden bg-white rounded-3xl p-6 shadow-inner border border-gray-100">
+                    <p class="text-[10px] uppercase font-black tracking-widest text-gray-400 mb-2">Message Received</p>
+                    <p id="res-reason" class="text-gray-600 font-medium"></p>
+                </div>
+                
+                <p id="res-date" class="text-[10px] font-black text-rose-300 uppercase tracking-[0.2em] pt-4"></p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIGURATION (Use the same one from your index.html)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfgzJzDVOU2Zi3La8BMCKCdTPhyBeup_M",
+            authDomain: "val-project-34b84.firebaseapp.com",
+            projectId: "val-project-34b84",
+            storageBucket: "val-project-34b84.firebasestorage.app",
+            messagingSenderId: "247007134664",
+            appId: "1:247007134664:web:6e75fc3ef833a53e9676fd",
+            measurementId: "G-8CHL8H67RX"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const id = new URLSearchParams(window.location.search).get('id');
+
+        function fireHearts() {
+            const scalar = 2;
+            const heart = confetti.shapeFromPath({ path: 'M0 10 C0 6, 3 2, 6 2 C8 2, 10 3, 10 5 C10 3, 12 2, 14 2 C17 2, 20 6, 20 10 C20 13, 17 17, 10 21 C3 17, 0 13, 0 10' });
+
+            confetti({
+                shapes: [heart],
+                particleCount: 80,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#ff4d6d', '#ff758f', '#ffb3c1'],
+                scalar
+            });
+        }
+
+        async function loadResult() {
+            if (!id) return;
+            try {
+                const snap = await getDoc(doc(db, "proposals", id));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const statusText = document.getElementById('res-status');
+                    
+                    if (data.status === 'accepted') {
+                        statusText.innerText = "She Said Yes!";
+                        statusText.classList.add("text-green-500");
+                        setTimeout(fireHearts, 500); // Trigger celebration
+                    } else if (data.status === 'declined') {
+                        statusText.innerText = "A Quiet No";
+                        statusText.classList.add("text-rose-600");
+                    } else {
+                        statusText.innerText = "Still Waiting...";
+                        statusText.classList.add("text-amber-500");
+                    }
+
+                    document.getElementById('res-msg').innerText = `"${data.msg}"`;
+                    document.getElementById('res-date').innerText = `Date: ${data.date}`;
+                    
+                    const gif = data.status === 'accepted' ? "https://media.giphy.com/media/v1.Y2lkPWVjZjA1ZTQ3OWJlMHMwN2RzaHFnaDYzY3k2a2xpc2Q4YmlqeG5kZWsxeXlsdTdtYSZlcD12MV9naWZzX3RyZW5kaW5nJmN0PWc/UmnWEKDFoPmcZHmwFl/giphy.gif" : 
+                                data.status === 'declined' ? "https://media.giphy.com/media/7SF5scGB2AFrO/giphy.gif" :
+                                "https://media.giphy.com/media/c76IJLufpNUMo/giphy.gif";
+                    document.getElementById('res-gif').src = gif;
+
+                    if(data.reason) {
+                        document.getElementById('reason-box').classList.remove('hidden');
+                        document.getElementById('res-reason').innerText = data.reason;
+                    }
+
+                    document.getElementById('loading').classList.add('hidden');
+                    document.getElementById('content').classList.remove('hidden');
+                }
+            } catch (err) { console.error(err); }
+        }
+        loadResult();
+    </script>
+</body>
+</html>

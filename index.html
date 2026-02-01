@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Propose.ly | Premium Proposal Creator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; background: #fff1f2; }
+        .cursive { font-family: 'Dancing Script', cursive; }
+        .hidden { display: none !important; }
+        
+        /* Floating Emoji Background */
+        .emoji-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .emoji { position: absolute; bottom: -50px; animation: float 5s linear infinite; opacity: 0; font-size: 24px; }
+        @keyframes float {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; }
+        }
+
+        .glass { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #fda4af; border-radius: 10px; }
+        
+        input, select, textarea { border: 1px solid #fee2e2 !important; }
+        input:focus, select:focus, textarea:focus { ring: 2px #fb7185 !important; outline: none; }
+
+        /* Toast Styling */
+        #toast { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translate(-50%, 100px); opacity: 0; }
+        #toast.show { transform: translate(-50%, 0); opacity: 1; }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfgzJzDVOU2Zi3La8BMCKCdTPhyBeup_M",
+            authDomain: "val-project-34b84.firebaseapp.com",
+            projectId: "val-project-34b84",
+            storageBucket: "val-project-34b84.firebasestorage.app",
+            messagingSenderId: "247007134664",
+            appId: "1:247007134664:web:6e75fc3ef833a53e9676fd",
+            measurementId: "G-8CHL8H67RX"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- UTILS ---
+        window.notify = (msg) => {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        };
+
+        // --- NAVIGATION ---
+        window.showScreen = (id) => {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        };
+
+        // --- AUTH LOGIC ---
+        window.handleSignUp = async () => {
+            const e = document.getElementById('reg-email').value;
+            const p = document.getElementById('reg-pass').value;
+            if(!e || !p) return alert("Fill in all fields");
+            try { await createUserWithEmailAndPassword(auth, e, p); } catch(err) { alert(err.message); }
+        };
+
+        window.handleLogin = async () => {
+            const e = document.getElementById('log-email').value;
+            const p = document.getElementById('log-pass').value;
+            if(!e || !p) return alert("Fill in all fields");
+            try { await signInWithEmailAndPassword(auth, e, p); } catch(err) { alert(err.message); }
+        };
+
+        window.logout = () => signOut(auth);
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) { loadDashboard(user.uid); showScreen('screen-dashboard'); }
+            else { showScreen('screen-home'); }
+        });
+
+        // --- DASHBOARD LOGIC ---
+        window.createProposal = async () => {
+            const type = document.getElementById('prop-type').value;
+            const msg = document.getElementById('prop-msg').value;
+            const btn = document.getElementById('gen-btn');
+            
+            if(!msg) return alert("Please write a message first!");
+            
+            btn.innerText = "Generating...";
+            try {
+                const docRef = await addDoc(collection(db, "proposals"), {
+                    uid: auth.currentUser.uid,
+                    type, msg, status: 'Pending', reason: '', date: new Date().toLocaleDateString()
+                });
+                
+                // FIXED LINK GENERATION
+                let baseUrl = window.location.href.split('index.html')[0];
+                const link = baseUrl + "view.html?id=" + docRef.id;
+                
+                window.notify("✨ Link Generated Successfully!");
+                prompt("❤️ Copy this link and send it to your partner:", link);
+                btn.innerText = "Generate Link";
+                document.getElementById('prop-msg').value = ""; 
+            } catch (err) { alert(err.message); btn.innerText = "Generate Link"; }
+        };
+
+        window.deleteProposal = async (id) => {
+            if(confirm("Are you sure you want to delete this feedback?")) {
+                try {
+                    await deleteDoc(doc(db, "proposals", id));
+                    window.notify("🗑️ Deleted successfully");
+                } catch (err) { alert("Error deleting: " + err.message); }
+            }
+        };
+
+        window.reuseProposal = (msg, type) => {
+            document.getElementById('prop-msg').value = msg;
+            document.getElementById('prop-type').value = type;
+            document.getElementById('screen-dashboard').scrollTo({top: 0, behavior: 'smooth'});
+        };
+
+        window.shareResult = (id) => {
+            let baseUrl = window.location.href.split('index.html')[0];
+            const resultLink = baseUrl + "result.html?id=" + id;
+            prompt("Copy this link to view or share the full response page:", resultLink);
+        };
+
+        function loadDashboard(uid) {
+            const q = query(collection(db, "proposals"), where("uid", "==", uid));
+            onSnapshot(q, (snapshot) => {
+                const list = document.getElementById('response-list');
+                list.innerHTML = snapshot.empty ? '<p class="text-gray-400 text-xs text-center py-4">No proposals sent yet.</p>' : "";
+                
+                snapshot.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const id = docSnap.id;
+                    
+                    let statusGif = "https://media.giphy.com/media/c76IJLufpNUMo/giphy.gif"; 
+                    let statusColor = 'bg-amber-100 text-amber-600';
+                    
+                    if (d.status === 'accepted') {
+                        statusGif = "https://media.giphy.com/media/l41lH4ADRtAYnGsLe/giphy.gif";
+                        statusColor = 'bg-green-100 text-green-600';
+                    } else if (d.status === 'declined') {
+                        statusGif = "https://media.giphy.com/media/7SF5scGB2AFrO/giphy.gif";
+                        statusColor = 'bg-rose-100 text-rose-600';
+                    }
+
+                    list.innerHTML += `
+                        <div class="p-4 bg-white rounded-2xl mb-3 border border-rose-50 shadow-sm">
+                            <div class="flex gap-3">
+                                <img src="${statusGif}" class="w-12 h-12 rounded-lg object-cover border border-gray-100">
+                                <div class="flex-1">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="text-[10px] font-black uppercase text-gray-400">${d.date}</span>
+                                        <div class="flex gap-2">
+                                            <button onclick="shareResult('${id}')" title="Share Result" class="text-xs opacity-40 hover:opacity-100">🔗</button>
+                                            <button onclick="reuseProposal(\`${d.msg}\`, '${d.type}')" title="Reuse Message" class="text-xs opacity-40 hover:opacity-100">🔄</button>
+                                            <button onclick="deleteProposal('${id}')" title="Delete" class="text-xs opacity-40 hover:opacity-100 text-rose-500">🗑️</button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <p class="text-xs font-bold text-gray-700">${d.type}</p>
+                                        <span class="px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${statusColor}">${d.status}</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-500 italic mb-2">"${d.msg}"</p>
+                                    ${d.reason ? `<div class="p-2 bg-rose-50 rounded-lg text-[10px] text-rose-700"><b>Reason:</b> ${d.reason}</div>` : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                });
+            });
+        }
+
+        window.togglePass = (id) => {
+            const x = document.getElementById(id);
+            x.type = x.type === "password" ? "text" : "password";
+        };
+    </script>
+</head>
+
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="emoji-container" id="emoji-bg"></div>
+
+    <div id="toast" class="fixed bottom-10 left-1/2 z-50 bg-gray-900 text-white px-6 py-3 rounded-full text-xs font-bold shadow-2xl"></div>
+
+    <div class="relative z-10 w-full max-w-sm glass rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        
+        <div class="flex-1 overflow-y-auto custom-scroll">
+            <div id="screen-home" class="screen p-8 py-12 text-center">
+                <div class="w-20 h-20 bg-rose-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl animate-pulse">
+                    <span class="text-4xl">❤️</span>
+                </div>
+                <h1 class="text-5xl font-black text-rose-600 cursive mb-2">Propose.ly</h1>
+                <p class="text-rose-400 font-bold text-[10px] tracking-widest uppercase mb-10">Premium Experience</p>
+                <div class="space-y-4">
+                    <button onclick="showScreen('screen-signup')" class="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg active:scale-95 transition-all text-xs uppercase tracking-widest">Start Your Story</button>
+                    <button onclick="showScreen('screen-login')" class="w-full py-2 text-rose-500 font-bold text-sm">Already a member? Sign In</button>
+                </div>
+            </div>
+
+            <div id="screen-signup" class="screen hidden p-8">
+                <button onclick="showScreen('screen-home')" class="text-gray-400 text-[10px] font-black mb-6 uppercase tracking-widest">← Back</button>
+                <h2 class="text-3xl font-black text-gray-800 mb-1">Join us</h2>
+                <p class="text-gray-500 text-xs mb-8">Create an account to start proposing.</p>
+                <input id="reg-email" type="email" placeholder="Email Address" class="w-full p-4 bg-gray-50 rounded-2xl mb-3 text-sm">
+                <div class="relative mb-8">
+                    <input id="reg-pass" type="password" placeholder="Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm">
+                    <button onclick="togglePass('reg-pass')" class="absolute right-4 top-4 opacity-30">👁️</button>
+                </div>
+                <button onclick="handleSignUp()" class="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold shadow-lg mb-4 active:scale-95 transition-all">Create Account</button>
+            </div>
+
+            <div id="screen-login" class="screen hidden p-8">
+                <button onclick="showScreen('screen-home')" class="text-gray-400 text-[10px] font-black mb-6 uppercase tracking-widest">← Back</button>
+                <h2 class="text-3xl font-black text-gray-800 mb-1">Welcome</h2>
+                <p class="text-gray-500 text-xs mb-8">Sign in to see your responses.</p>
+                <input id="log-email" type="email" placeholder="Email Address" class="w-full p-4 bg-gray-50 rounded-2xl mb-3 text-sm">
+                <div class="relative mb-8">
+                    <input id="log-pass" type="password" placeholder="Password" class="w-full p-4 bg-gray-50 rounded-2xl text-sm">
+                    <button onclick="togglePass('log-pass')" class="absolute right-4 top-4 opacity-30">👁️</button>
+                </div>
+                <button onclick="handleLogin()" class="w-full bg-rose-600 text-white py-4 rounded-2xl font-bold shadow-lg mb-4 active:scale-95 transition-all">Sign In</button>
+            </div>
+
+            <div id="screen-dashboard" class="screen hidden p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <span class="cursive text-2xl text-rose-600 font-bold">Propose.ly</span>
+                    <button onclick="logout()" class="text-[9px] bg-rose-100 text-rose-600 px-3 py-1 rounded-full font-black uppercase">Logout</button>
+                </div>
+
+                <div class="bg-rose-500 p-6 rounded-[2rem] text-white shadow-xl mb-8">
+                    <h3 class="font-bold text-lg mb-4">New Proposal</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[9px] uppercase font-black opacity-70 ml-1">Occasion</label>
+                            <select id="prop-type" class="w-full p-3 bg-white/20 rounded-xl text-sm border-none text-white font-medium focus:ring-0">
+                                <option value="Valentine" class="text-gray-800">Valentine ❤️</option>
+                                <option value="Marriage" class="text-gray-800">Marriage 💍</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] uppercase font-black opacity-70 ml-1">Message</label>
+                            <textarea id="prop-msg" class="w-full p-3 bg-white/20 rounded-xl text-sm border-none text-white placeholder-rose-200 focus:ring-0" rows="2" placeholder="Write something sweet..."></textarea>
+                        </div>
+                        <button id="gen-btn" onclick="createProposal()" class="w-full bg-white text-rose-600 py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg active:scale-95 transition-all">Generate Link</button>
+                    </div>
+                </div>
+
+                <h3 class="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4 ml-2">Live Status</h3>
+                <div id="response-list" class="space-y-3 pb-4"></div>
+            </div>
+        </div>
+
+        <footer class="p-4 text-center border-t border-rose-50 bg-white/50">
+            <p class="text-[9px] font-black text-rose-300 uppercase tracking-widest">
+                Made with ❤️ by Team RYDER😎
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Emoji Rain
+        const emojis = ['❤️', '💖', '💘', '✨', '🌹', '💍'];
+        function createEmoji() {
+            const e = document.createElement('div');
+            e.className = 'emoji';
+            e.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+            e.style.left = Math.random() * 100 + 'vw';
+            e.style.animationDuration = (Math.random() * 2 + 3) + 's';
+            const container = document.getElementById('emoji-bg');
+            if(container) container.appendChild(e);
+            setTimeout(() => e.remove(), 5000);
+        }
+        setInterval(createEmoji, 400);
+    </script>
+</body>
+</html>

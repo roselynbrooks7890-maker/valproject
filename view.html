@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>A Special Message | Propose.ly</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #fff1f2; overflow-x: hidden; }
+        .cursive { font-family: 'Dancing Script', cursive; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        
+        /* Toast Animation */
+        #toast { transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); transform: translate(-50%, 100px); opacity: 0; }
+        #toast.show { transform: translate(-50%, 0); opacity: 1; }
+        
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div id="toast" class="fixed bottom-10 left-1/2 z-50 bg-gray-900 text-white px-8 py-3 rounded-full text-xs font-black uppercase tracking-widest shadow-2xl"></div>
+
+    <div class="w-full max-w-md glass rounded-[3rem] shadow-2xl p-8 md:p-12 text-center relative overflow-hidden">
+        <div id="loading" class="py-20 text-rose-400 cursive text-2xl animate-pulse">Opening your message...</div>
+
+        <div id="content" class="hidden space-y-8">
+            <img id="main-gif" src="https://media.giphy.com/media/c76IJLufpNUMo/giphy.gif" class="w-48 h-48 object-cover rounded-full mx-auto border-4 border-rose-100 shadow-lg pulse">
+            
+            <div>
+                <h1 id="prop-type" class="text-xs font-black uppercase tracking-[0.3em] text-rose-400 mb-2"></h1>
+                <p id="prop-msg" class="text-2xl md:text-3xl font-bold text-gray-800 leading-tight italic cursive"></p>
+            </div>
+
+            <div id="action-area" class="space-y-4">
+                <button onclick="respond('accepted')" class="w-full bg-rose-500 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-rose-600 active:scale-95 transition-all uppercase tracking-widest text-xs">Accept ❤️</button>
+                
+                <div class="pt-2">
+                    <button onclick="toggleReason()" class="text-gray-400 text-[10px] font-black uppercase tracking-widest hover:text-rose-400 transition-colors">Decline or Add Note</button>
+                </div>
+
+                <div id="reason-box" class="hidden space-y-3 pt-4">
+                    <textarea id="reason-text" class="w-full p-4 bg-rose-50 rounded-2xl text-sm border-none focus:ring-2 focus:ring-rose-200" placeholder="Type a reason or a sweet note..."></textarea>
+                    <button onclick="respond('declined')" class="w-full bg-gray-100 text-gray-500 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest active:scale-95 transition-all">Send Response</button>
+                </div>
+            </div>
+
+            <div id="final-message" class="hidden p-6 bg-green-50 rounded-3xl border border-green-100">
+                <p class="text-green-600 font-bold text-sm">Your response has been sent! ✨</p>
+                <p class="text-green-400 text-[10px] uppercase mt-1 font-black">He's going to be so happy.</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // CONFIG (Same as your index.html)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfgzJzDVOU2Zi3La8BMCKCdTPhyBeup_M",
+            authDomain: "val-project-34b84.firebaseapp.com",
+            projectId: "val-project-34b84",
+            storageBucket: "val-project-34b84.firebasestorage.app",
+            messagingSenderId: "247007134664",
+            appId: "1:247007134664:web:6e75fc3ef833a53e9676fd",
+            measurementId: "G-8CHL8H67RX"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        const id = new URLSearchParams(window.location.search).get('id');
+
+        window.notify = (msg) => {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        };
+
+        window.toggleReason = () => {
+            document.getElementById('reason-box').classList.toggle('hidden');
+        };
+
+        window.respond = async (status) => {
+            const reason = document.getElementById('reason-text').value;
+            const docRef = doc(db, "proposals", id);
+
+            try {
+                await updateDoc(docRef, { status, reason });
+                
+                // Show Success Message
+                window.notify(status === 'accepted' ? "❤️ Response Sent Successfully!" : "📩 Feedback Sent");
+                
+                // UI Changes
+                document.getElementById('action-area').classList.add('hidden');
+                document.getElementById('final-message').classList.remove('hidden');
+                
+                // Update GIF to success or sad
+                document.getElementById('main-gif').src = status === 'accepted' 
+                    ? "https://media.giphy.com/media/l41lH4ADRtAYnGsLe/giphy.gif" 
+                    : "https://media.giphy.com/media/7SF5scGB2AFrO/giphy.gif";
+
+            } catch (err) { alert("Error: " + err.message); }
+        };
+
+        async function loadProposal() {
+            if (!id) return;
+            const snap = await getDoc(doc(db, "proposals", id));
+            if (snap.exists()) {
+                const data = snap.data();
+                document.getElementById('prop-type').innerText = `Invitation for ${data.type}`;
+                document.getElementById('prop-msg').innerText = data.msg;
+                
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('content').classList.remove('hidden');
+            }
+        }
+        loadProposal();
+    </script>
+</body>
+</html>
